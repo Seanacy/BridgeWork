@@ -1,0 +1,16 @@
+{
+  "name": "BridgeWork — Quick Cash Tasks Near You",
+  "short_name": "BridgeWork",
+  "description": "Find and claim quick cash tasks posted by local businesses.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#2d6a4f",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["business", "productivity"],
+  "lang": "en-US"
+}

@@ -1,0 +1,6 @@
+{
+  "buildCommand": "npx esbuild app.jsx --bundle --format=esm --outfile=app.js --jsx=automatic --external:react --external:react-dom/client --external:@supabase/supabase-js --external:react/jsx-runtime && sed -i \"s|MAPBOX_TOKEN_PLACEHOLDER|$MAPBOX_TOKEN|g\" index.html",
+  "outputDirectory": ".",
+  "framework": null,
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
