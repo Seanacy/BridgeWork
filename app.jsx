@@ -953,7 +953,7 @@ function MapView({ user, onAuth }) {
       {/* GPS + Post/Chat */}
       <div className="map-actions">
         <button className="top-btn" onClick={locateMe}>⊕</button>
-        {user && (role === 'business' || isAdminUser(user)) && (
+        {user && (role === 'business' || user?.email === ADMIN_EMAIL) && (
           <button className="top-btn" style={{ background: 'var(--green)', color: '#fff', fontWeight: 800, fontSize: '1.5rem' }}
             onClick={() => setPage('post')}>+</button>
         )}
@@ -971,7 +971,7 @@ function MapView({ user, onAuth }) {
             <div style={{ marginLeft: 'auto', fontSize: '0.75rem', opacity: 0.5 }}>Edit →</div>
           </div>
           <div className="sidebar-links">
-            {(role === 'business' || isAdminUser(user)) && (
+            {(role === 'business' || user?.email === ADMIN_EMAIL) && (
               <button className="sidebar-link" onClick={() => { setMenuOpen(false); setPage('post'); }}>
                 ➕ Post a Task
               </button>
