@@ -148,8 +148,10 @@ function PostJobForm({ user, onClose, onPosted }) {
   const [description, setDescription] = useState('');
   const [pay, setPay] = useState('');
   const [address, setAddress] = useState('');
+  const [timeframe, setTimeframe] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const handlePost = async () => {
     if (!title || !pay || !address) {
@@ -159,28 +161,46 @@ function PostJobForm({ user, onClose, onPosted }) {
     setSaving(true);
     setError('');
     try {
-      // Geocode the address
       const geo = await geocodeAddress(address);
       if (!geo) {
         setError('Could not find that address. Try being more specific.');
         setSaving(false);
         return;
       }
-
       const { error: insertErr } = await supabase.from('jobs').insert({
-        title,
-        description,
-        pay: parseFloat(pay),
-        address: geo.place_name || address,
-        lat: geo.lat,
-        lng: geo.lng,
-        status: 'open',
-        posted_by: user.id,
+        title, description, pay: parseFloat(pay),
+        address: geo.place_name || address, lat: geo.lat, lng: geo.lng,
+        status: 'open', posted_by: user.id, timeframe,
       });
       if (insertErr) throw insertErr;
-
       onPosted && onPosted();
       onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendToBridgeWork = async () => {
+    if (!title || !address) {
+      setError('Fill in the title and address.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      const profileName = user?.user_metadata?.username || user?.email?.split('@')[0] || 'Unknown';
+      const { error: insertErr } = await supabase.from('private_help_requests').insert({
+        requested_by: user.id,
+        establishment_name: profileName,
+        title, description, address, timeframe,
+        category: 'task_post_request',
+        status: 'pending',
+      });
+      if (insertErr) throw insertErr;
+      setSuccess('Request sent! BridgeWork will review and post this task from our account.');
+      setTimeout(() => onClose(), 2500);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -201,6 +221,11 @@ function PostJobForm({ user, onClose, onPosted }) {
         {error && (
           <div style={{ padding: '0.6rem', background: 'rgba(239,68,68,0.1)', color: 'var(--red)', borderRadius: '0.5rem', fontSize: '0.85rem', marginBottom: '1rem' }}>
             {error}
+          </div>
+        )}
+        {success && (
+          <div style={{ padding: '0.75rem', background: 'rgba(34,197,94,0.1)', color: '#22c55e', borderRadius: '0.5rem', fontSize: '0.85rem', marginBottom: '1rem', fontWeight: 600, textAlign: 'center' }}>
+            {success}
           </div>
         )}
         <div className="form-group">
@@ -229,9 +254,31 @@ function PostJobForm({ user, onClose, onPosted }) {
             This gets placed on the map so workers can find it
           </small>
         </div>
-        <button className="btn btn-green btn-block" onClick={handlePost} disabled={saving}>
+        <div className="form-group">
+          <label>Timeframe (optional)</label>
+          <input value={timeframe} onChange={e => setTimeframe(e.target.value)}
+            placeholder="e.g. This week, ASAP, Flexible" />
+        </div>
+
+        <button className="btn btn-green btn-block" onClick={handlePost} disabled={saving}
+          style={{ marginBottom: '0.75rem' }}>
           {saving ? 'Posting...' : 'Post Task'}
         </button>
+
+        <div style={{ position: 'relative', textAlign: 'center', margin: '0.5rem 0' }}>
+          <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, borderTop: '1px solid var(--border)' }} />
+          <span style={{ position: 'relative', background: 'var(--bg)', padding: '0 0.75rem', fontSize: '0.8rem', color: 'var(--text-dim)' }}>or</span>
+        </div>
+
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '1rem', marginTop: '0.5rem' }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+            Want us to post this from the official <strong>BridgeWork</strong> account? We'll set the pay amount and handle the posting for you.
+          </p>
+          <button className="btn btn-block" onClick={handleSendToBridgeWork} disabled={saving}
+            style={{ width: '100%', padding: '0.7rem', borderRadius: '0.75rem', border: '1px solid var(--green)', background: 'transparent', color: 'var(--green)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
+            {saving ? 'Sending...' : 'Have BridgeWork Post This'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -586,14 +633,40 @@ function AdminPanel({ user, onClose }) {
   const [notifMsg, setNotifMsg] = useState('');
   const [userFilter, setUserFilter] = useState('all');
   const [search, setSearch] = useState('');
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [payAmounts, setPayAmounts] = useState({});
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     const { data: j } = await supabase.from('jobs').select('*').order('created_at', { ascending: false });
     setJobs(j || []);
-    // We can't list auth users from client, so we'll query jobs for unique posters/claimers
-    // For now show jobs data
+    const { data: reqs } = await supabase.from('private_help_requests').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+    setPendingRequests(reqs || []);
+  };
+
+  const approveRequest = async (req) => {
+    const payAmount = parseFloat(payAmounts[req.id]);
+    if (!payAmount || payAmount <= 0) { alert('Set a pay amount first'); return; }
+    try {
+      const geo = await geocodeAddress(req.address || '');
+      const { error: jobErr } = await supabase.from('jobs').insert({
+        title: req.title, description: req.description,
+        pay: payAmount, address: req.address || 'Address TBD',
+        lat: geo?.lat || null, lng: geo?.lng || null,
+        status: 'open', posted_by: user.id, timeframe: req.timeframe,
+      });
+      if (jobErr) throw jobErr;
+      await supabase.from('private_help_requests').update({
+        status: 'approved', admin_notes: `Posted by BridgeWork at $${payAmount}`, updated_at: new Date().toISOString(),
+      }).eq('id', req.id);
+      loadData();
+    } catch (err) { alert('Error: ' + err.message); }
+  };
+
+  const rejectRequest = async (req) => {
+    await supabase.from('private_help_requests').update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', req.id);
+    loadData();
   };
 
   const openCount = jobs.filter(j => j.status === 'open').length;
@@ -637,6 +710,7 @@ function AdminPanel({ user, onClose }) {
         <div className="admin-stat"><div className="admin-stat-num">{openCount}</div><div className="admin-stat-label">Open</div></div>
         <div className="admin-stat"><div className="admin-stat-num">{activeCount}</div><div className="admin-stat-label">Active</div></div>
         <div className="admin-stat"><div className="admin-stat-num">{reportedCount}</div><div className="admin-stat-label">Reported</div></div>
+        <div className="admin-stat"><div className="admin-stat-num" style={{ color: pendingRequests.length > 0 ? '#ef4444' : undefined }}>{pendingRequests.length}</div><div className="admin-stat-label">Pending</div></div>
       </div>
 
       {/* Broadcast */}
@@ -656,6 +730,50 @@ function AdminPanel({ user, onClose }) {
           placeholder="Type your message..." style={{ minHeight: '80px', marginBottom: '0.75rem' }} />
         <button className="btn btn-blue btn-block" onClick={sendNotification}>Send Notification</button>
       </div>
+
+      {/* Pending Task Requests */}
+      {pendingRequests.length > 0 && (
+        <div className="card" style={{ margin: '1rem', padding: '1rem' }}>
+          <h4 style={{ fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            📋 Pending Task Requests
+            <span style={{ background: '#ef4444', color: '#fff', borderRadius: '1rem', padding: '0.1rem 0.5rem', fontSize: '0.75rem', fontWeight: 800 }}>
+              {pendingRequests.length}
+            </span>
+          </h4>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {pendingRequests.map(req => (
+              <div key={req.id} style={{ border: '1px solid var(--border)', borderRadius: '0.75rem', padding: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{req.title}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>From: {req.establishment_name}</div>
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>
+                    {new Date(req.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+                {req.description && <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{req.description}</p>}
+                {req.address && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.25rem' }}>📍 {req.address}</div>}
+                {req.timeframe && <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>⏰ {req.timeframe}</div>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  <span style={{ fontWeight: 800, fontSize: '1rem' }}>$</span>
+                  <input type="number" placeholder="Set pay" value={payAmounts[req.id] || ''}
+                    onChange={e => setPayAmounts(prev => ({ ...prev, [req.id]: e.target.value }))}
+                    style={{ width: '80px', padding: '0.4rem 0.5rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem' }} />
+                  <button onClick={() => approveRequest(req)}
+                    style={{ flex: 1, padding: '0.5rem', borderRadius: '0.5rem', border: 'none', background: '#22c55e', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem' }}>
+                    Post as BridgeWork
+                  </button>
+                  <button onClick={() => rejectRequest(req)}
+                    style={{ padding: '0.5rem 0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search */}
       <div style={{ padding: '0 1rem' }}>
