@@ -419,7 +419,7 @@ function ProfilePage({ user, onClose }) {
       <div style={{ padding: '0 1.25rem 1rem' }}>
         {!editing ? (
           <button className="btn btn-primary btn-block" onClick={() => setEditing(true)}
-            style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '0.75rem', borderRadius: '0.75rem', fontWeight: 700, cursor: 'pointer', width: '100%', fontSize: '0.9rem' }}>
+            style={{ background: '#22c55e', color: '#fff', border: 'none', padding: '0.75rem', borderRadius: '0.75rem', fontWeight: 700, cursor: 'pointer', width: '100%', fontSize: '0.9rem' }}>
             Edit Profile
           </button>
         ) : (
@@ -472,7 +472,7 @@ function ProfilePage({ user, onClose }) {
                 Cancel
               </button>
               <button onClick={handleSaveProfile} disabled={saving}
-                style={{ flex: 1, padding: '0.7rem', borderRadius: '0.75rem', border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', opacity: saving ? 0.6 : 1 }}>
+                style={{ flex: 1, padding: '0.7rem', borderRadius: '0.75rem', border: 'none', background: '#22c55e', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', opacity: saving ? 0.6 : 1 }}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
