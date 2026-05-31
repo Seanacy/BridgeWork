@@ -2,13 +2,39 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createClient } from '@supabase/supabase-js';
 
-// ─── Supabase ───
-const SUPABASE_URL = 'https://vhuxkmwvmfdesdwkauaj.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_PfcDD3TbyWHlRD8Jn6PcRA_kCf9jfyF';
+// ─── Supabase (SSO: all apps authenticate against TentCity's project) ───
+const SUPABASE_URL = 'https://skdqogcectobrvokjxkb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNrZHFvZ2NlY3RvYnJ2b2tqeGtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxNzY4NTEsImV4cCI6MjA5NTc1Mjg1MX0.kixz5uR-X2XmlJTqw8QZ58k9IDBlT1Gjo0TcQZ9DWJ0';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const MAPBOX_TOKEN = window.__MAPBOX_TOKEN || '';
 const ADMIN_EMAIL = '247ggtms@gmail.com';
+
+// ─── Location Tracking (pings TentCity's location_pings table) ───
+async function hashUserId(userId) {
+  const data = new TextEncoder().encode(userId);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+const TRACKING_SESSION_ID = crypto.randomUUID();
+
+async function trackLocation(userId) {
+  if (!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(async (pos) => {
+    try {
+      const anonId = await hashUserId(userId);
+      await supabase.from('location_pings').insert({
+        anon_id: anonId,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        app_source: 'bridgework',
+        session_id: TRACKING_SESSION_ID,
+      });
+    } catch { /* silent fail — tracking should never break the app */ }
+  }, () => { /* geolocation denied — that's fine */ }, { enableHighAccuracy: false, timeout: 10000 });
+}
 
 // ─── Geocoding helper ───
 async function geocodeAddress(address) {
@@ -750,9 +776,11 @@ function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user || null);
       setLoading(false);
+      if (session?.user) trackLocation(session.user.id);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user || null);
+      if (_event === 'SIGNED_IN' && session?.user) trackLocation(session.user.id);
     });
     return () => subscription.unsubscribe();
   }, []);
