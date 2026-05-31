@@ -154,8 +154,8 @@ function PostJobForm({ user, onClose, onPosted }) {
   const [success, setSuccess] = useState('');
 
   const handlePost = async () => {
-    if (!title || !pay || !address) {
-      setError('Fill in the title, pay, and address.');
+    if (!title || !description || !pay || !address) {
+      setError('Fill in the title, description, pay, and address.');
       return;
     }
     setSaving(true);
@@ -183,8 +183,8 @@ function PostJobForm({ user, onClose, onPosted }) {
   };
 
   const handleSendToBridgeWork = async () => {
-    if (!title || !address) {
-      setError('Fill in the title and address.');
+    if (!title || !description || !address) {
+      setError('Fill in the title, description, and address.');
       return;
     }
     setSaving(true);
@@ -233,7 +233,7 @@ function PostJobForm({ user, onClose, onPosted }) {
           <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Help unload delivery truck" />
         </div>
         <div className="form-group">
-          <label>Description (optional)</label>
+          <label>Description</label>
           <textarea value={description} onChange={e => setDescription(e.target.value)}
             placeholder="What does the worker need to do? How long will it take?"
             style={{ minHeight: '100px' }} />

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bridgework-v19';
+const CACHE_NAME = 'bridgework-v20';
 const STATIC_ASSETS = ['/', '/index.html', '/app.js', '/favicon.svg', '/icon-192.png', '/icon-512.png', '/manifest.json'];
 
 self.addEventListener('install', (e) => {
