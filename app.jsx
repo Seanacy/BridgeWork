@@ -980,7 +980,7 @@ function MapView({ user, onAuth }) {
             <button className="sidebar-link" onClick={() => { setMenuOpen(false); setPage('contact'); }}>
               ✉ Contact Us
             </button>
-            {user.email === ADMIN_EMAIL && (
+            {user?.email === ADMIN_EMAIL && (
               <>
                 <div className="sidebar-divider" />
                 <button className="sidebar-link" onClick={() => { setMenuOpen(false); setPage('admin'); }}>
