@@ -831,17 +831,15 @@ function MapView({ user, onLogout }) {
       {/* Sidebar menu */}
       <div className={`sidebar-overlay ${menuOpen ? 'open' : ''}`} onClick={() => setMenuOpen(false)}>
         <div className="sidebar" onClick={e => e.stopPropagation()}>
-          <div className="sidebar-header">
+          <div className="sidebar-header" onClick={() => { setMenuOpen(false); setPage('profile'); }} style={{ cursor: 'pointer' }}>
             <div className="sidebar-avatar">{username[0]?.toUpperCase()}</div>
             <div>
               <div className="sidebar-name">{username}</div>
               <div className="sidebar-role">{role}</div>
             </div>
+            <div style={{ marginLeft: 'auto', fontSize: '0.75rem', opacity: 0.5 }}>Edit →</div>
           </div>
           <div className="sidebar-links">
-            <button className="sidebar-link" onClick={() => { setMenuOpen(false); setPage('profile'); }}>
-              👤 My Profile
-            </button>
             {role === 'business' && (
               <button className="sidebar-link" onClick={() => { setMenuOpen(false); setPage('post'); }}>
                 ➕ Post a Task
