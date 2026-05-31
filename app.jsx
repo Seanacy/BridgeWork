@@ -304,7 +304,6 @@ function JobDetail({ job, user, onClose, onClaim }) {
 
 // ─── Profile Page ───
 function ProfilePage({ user, onClose }) {
-  const { t } = useLang();
   const [profile, setProfile] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
