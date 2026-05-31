@@ -703,14 +703,15 @@ function AdminPanel({ user, onClose }) {
 }
 
 // ─── Main Map View ───
-function MapView({ user, onLogout }) {
+function MapView({ user, onAuth }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const markersRef = useRef([]);
   const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [page, setPage] = useState(null); // 'profile', 'post', 'contact', 'admin'
+  const [page, setPage] = useState(null); // 'profile', 'post', 'contact', 'admin', 'auth'
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const role = user?.user_metadata?.role || 'worker';
   const username = user?.user_metadata?.username || user?.email?.split('@')[0] || 'User';
 
@@ -770,8 +771,12 @@ function MapView({ user, onLogout }) {
         .addTo(map.current);
 
       el.addEventListener('click', () => {
-        setSelectedJob(job);
         map.current.flyTo({ center: [job.lng, job.lat], zoom: 14 });
+        if (!user) {
+          setShowSignupPrompt(true);
+        } else {
+          setSelectedJob(job);
+        }
       });
 
       markersRef.current.push(marker);
@@ -798,10 +803,19 @@ function MapView({ user, onLogout }) {
       {/* Top bar */}
       <div className="top-bar">
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button className="top-btn" onClick={() => setPage('profile')}>
-            {username[0]?.toUpperCase()}
-          </button>
-          <button className="top-btn" onClick={() => setMenuOpen(true)}>☰</button>
+          {user ? (
+            <>
+              <button className="top-btn" onClick={() => setPage('profile')}>
+                {username[0]?.toUpperCase()}
+              </button>
+              <button className="top-btn" onClick={() => setMenuOpen(true)}>☰</button>
+            </>
+          ) : (
+            <button className="top-btn" onClick={() => setPage('auth')}
+              style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem', background: 'var(--green)', color: '#fff', borderRadius: '1rem', fontWeight: 700 }}>
+              Sign Up
+            </button>
+          )}
         </div>
 
         <div className="top-banner">
@@ -821,7 +835,7 @@ function MapView({ user, onLogout }) {
       {/* GPS + Post/Chat */}
       <div className="map-actions">
         <button className="top-btn" onClick={locateMe}>⊕</button>
-        {role === 'business' && (
+        {user && role === 'business' && (
           <button className="top-btn" style={{ background: 'var(--green)', color: '#fff', fontWeight: 800, fontSize: '1.5rem' }}
             onClick={() => setPage('post')}>+</button>
         )}
@@ -860,8 +874,31 @@ function MapView({ user, onLogout }) {
         </div>
       </div>
 
+      {/* Signup prompt overlay — shown when unauthenticated user clicks a task */}
+      {showSignupPrompt && !user && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+          onClick={() => setShowSignupPrompt(false)}>
+          <div style={{ background: 'var(--surface)', borderRadius: '1rem', padding: '2rem', maxWidth: '340px', width: '90%', textAlign: 'center' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💼</div>
+            <h3 style={{ fontWeight: 800, fontSize: '1.1rem', marginBottom: '0.5rem' }}>Sign up to see task details</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '1.25rem', lineHeight: 1.5 }}>
+              Create a free account to view task details, claim jobs, and start earning cash.
+            </p>
+            <button onClick={() => { setShowSignupPrompt(false); setPage('auth'); }}
+              style={{ width: '100%', padding: '0.75rem', borderRadius: '0.75rem', border: 'none', background: 'var(--green)', color: '#fff', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer', marginBottom: '0.5rem' }}>
+              Sign Up Free
+            </button>
+            <button onClick={() => setShowSignupPrompt(false)}
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.85rem', cursor: 'pointer' }}>
+              Maybe later
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Job detail sheet */}
-      {selectedJob && (
+      {selectedJob && user && (
         <JobDetail
           job={selectedJob}
           user={user}
@@ -870,11 +907,22 @@ function MapView({ user, onLogout }) {
         />
       )}
 
+      {/* Auth form as a page panel */}
+      {page === 'auth' && !user && (
+        <div className="page-panel">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1rem 1.25rem' }}>
+            <button className="back-btn" onClick={() => setPage(null)}>←</button>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, opacity: 0.75 }}>Map</span>
+          </div>
+          <AuthForm onAuth={(u) => { onAuth(u); setPage(null); }} />
+        </div>
+      )}
+
       {/* Page panels */}
-      {page === 'profile' && <ProfilePage user={user} onClose={() => setPage(null)} />}
-      {page === 'post' && <PostJobForm user={user} onClose={() => setPage(null)} onPosted={loadJobs} />}
+      {page === 'profile' && user && <ProfilePage user={user} onClose={() => setPage(null)} />}
+      {page === 'post' && user && <PostJobForm user={user} onClose={() => setPage(null)} onPosted={loadJobs} />}
       {page === 'contact' && <ContactPage onClose={() => setPage(null)} />}
-      {page === 'admin' && <AdminPanel user={user} onClose={() => setPage(null)} />}
+      {page === 'admin' && user && <AdminPanel user={user} onClose={() => setPage(null)} />}
     </div>
   );
 }
@@ -906,11 +954,7 @@ function App() {
     );
   }
 
-  if (!user) {
-    return <AuthForm onAuth={(u) => setUser(u)} />;
-  }
-
-  return <MapView user={user} />;
+  return <MapView user={user} onAuth={(u) => setUser(u)} />;
 }
 
 createRoot(document.getElementById('root')).render(<App />);
