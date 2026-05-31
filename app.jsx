@@ -1008,7 +1008,7 @@ function MapView({ user, onAuth }) {
               Sign Up Free
             </button>
             <button onClick={() => setShowSignupPrompt(false)}
-              style={{ width: '100%', padding: '0.5rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', fontSize: '0.85rem', cursor: 'pointer' }}>
+              style={{ width: '100%', padding: '0.5rem', borderRadius: '0.75rem', border: 'none', background: '#333', color: '#fff', fontSize: '0.85rem', cursor: 'pointer' }}>
               Maybe later
             </button>
           </div>
