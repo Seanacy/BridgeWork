@@ -304,24 +304,34 @@ function JobDetail({ job, user, onClose, onClaim }) {
 
 // ─── Profile Page ───
 function ProfilePage({ user, onClose }) {
+  const { t } = useLang();
   const [profile, setProfile] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [saveMsg, setSaveMsg] = useState('');
+  const [saving, setSaving] = useState(false);
   const role = user?.user_metadata?.role || 'worker';
   const username = user?.user_metadata?.username || user?.email?.split('@')[0] || 'User';
 
   useEffect(() => {
     loadData();
+    setEditName(user?.user_metadata?.username || user?.email?.split('@')[0] || '');
+    setEditEmail(user?.email || '');
+    setEditPhone(user?.user_metadata?.phone || '');
   }, []);
 
   const loadData = async () => {
-    // Load job stats
     if (role === 'worker') {
       const { data: done } = await supabase.from('jobs').select('id, pay').eq('claimed_by', user.id).eq('status', 'done');
       const { data: missed } = await supabase.from('jobs').select('id').eq('claimed_by', user.id).eq('status', 'reported');
       const earned = (done || []).reduce((sum, j) => sum + (j.pay || 0), 0);
       setProfile({ done: (done || []).length, missed: (missed || []).length, earned });
-
       const { data: history } = await supabase.from('jobs').select('*').eq('claimed_by', user.id).order('created_at', { ascending: false }).limit(20);
       setJobs(history || []);
     } else {
@@ -335,6 +345,46 @@ function ProfilePage({ user, onClose }) {
     setLoading(false);
   };
 
+  const handleSaveProfile = async () => {
+    setSaving(true);
+    setSaveMsg('');
+    try {
+      // Update username in profiles table and auth metadata
+      if (editName && editName !== username) {
+        await supabase.from('profiles').update({ username: editName }).eq('id', user.id);
+        await supabase.auth.updateUser({ data: { username: editName } });
+      }
+
+      // Update email
+      if (editEmail && editEmail !== user.email) {
+        const { error } = await supabase.auth.updateUser({ email: editEmail });
+        if (error) { setSaveMsg('Email update failed: ' + error.message); setSaving(false); return; }
+      }
+
+      // Update phone in metadata
+      if (editPhone !== (user?.user_metadata?.phone || '')) {
+        await supabase.auth.updateUser({ data: { phone: editPhone } });
+      }
+
+      // Update password
+      if (newPassword) {
+        if (newPassword.length < 6) { setSaveMsg('Password must be at least 6 characters'); setSaving(false); return; }
+        if (newPassword !== confirmPassword) { setSaveMsg('Passwords do not match'); setSaving(false); return; }
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) { setSaveMsg('Password update failed: ' + error.message); setSaving(false); return; }
+        setNewPassword('');
+        setConfirmPassword('');
+      }
+
+      setSaveMsg('Profile updated!');
+      setEditing(false);
+      setTimeout(() => setSaveMsg(''), 3000);
+    } catch (e) {
+      setSaveMsg('Something went wrong');
+    }
+    setSaving(false);
+  };
+
   return (
     <div className="page-panel">
       <div className="profile-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -342,8 +392,8 @@ function ProfilePage({ user, onClose }) {
         <span style={{ fontSize: '0.85rem', fontWeight: 600, opacity: 0.75 }}>Map</span>
       </div>
       <div className="profile-header">
-        <div className="profile-avatar">{username[0]?.toUpperCase()}</div>
-        <div className="profile-name">{username}</div>
+        <div className="profile-avatar">{(editing ? editName : username)[0]?.toUpperCase()}</div>
+        <div className="profile-name">{editing ? editName : username}</div>
         <div className="profile-badge">{role}</div>
         <div className="profile-email">{user.email}</div>
       </div>
@@ -366,7 +416,72 @@ function ProfilePage({ user, onClose }) {
         </div>
       )}
 
-      <div style={{ padding: '1.25rem' }}>
+      {/* Edit Profile Section */}
+      <div style={{ padding: '0 1.25rem 1rem' }}>
+        {!editing ? (
+          <button className="btn btn-primary btn-block" onClick={() => setEditing(true)}
+            style={{ background: 'var(--accent)', color: '#fff', border: 'none', padding: '0.75rem', borderRadius: '0.75rem', fontWeight: 700, cursor: 'pointer', width: '100%', fontSize: '0.9rem' }}>
+            Edit Profile
+          </button>
+        ) : (
+          <div className="card" style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <h3 style={{ fontWeight: 700, marginBottom: '0.25rem', fontSize: '1rem' }}>Edit Profile</h3>
+
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block', color: 'var(--text-muted)' }}>Username</label>
+              <input type="text" value={editName} onChange={e => setEditName(e.target.value)} placeholder="Your name"
+                style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block', color: 'var(--text-muted)' }}>Email</label>
+              <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="your@email.com"
+                style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block', color: 'var(--text-muted)' }}>Phone (optional)</label>
+              <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="(612) 555-1234"
+                style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.75rem', marginTop: '0.25rem' }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block', color: 'var(--text-muted)' }}>New Password</label>
+              <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Leave blank to keep current"
+                style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+            </div>
+
+            {newPassword && (
+              <div>
+                <label style={{ fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem', display: 'block', color: 'var(--text-muted)' }}>Confirm Password</label>
+                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm new password"
+                  style={{ width: '100%', padding: '0.65rem 0.75rem', borderRadius: '0.5rem', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '0.9rem', boxSizing: 'border-box' }} />
+              </div>
+            )}
+
+            {saveMsg && (
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, textAlign: 'center', padding: '0.5rem', borderRadius: '0.5rem',
+                color: saveMsg.includes('updated') ? 'var(--green)' : '#e74c3c',
+                background: saveMsg.includes('updated') ? 'rgba(76,175,80,0.1)' : 'rgba(231,76,60,0.1)' }}>
+                {saveMsg}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button onClick={() => { setEditing(false); setSaveMsg(''); }} disabled={saving}
+                style={{ flex: 1, padding: '0.7rem', borderRadius: '0.75rem', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem' }}>
+                Cancel
+              </button>
+              <button onClick={handleSaveProfile} disabled={saving}
+                style={{ flex: 1, padding: '0.7rem', borderRadius: '0.75rem', border: 'none', background: 'var(--accent)', color: '#fff', fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem', opacity: saving ? 0.6 : 1 }}>
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: '0 1.25rem 1rem' }}>
         <h3 style={{ fontWeight: 700, marginBottom: '1rem' }}>
           {role === 'worker' ? 'Job History' : 'Your Posted Tasks'}
         </h3>
