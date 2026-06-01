@@ -323,7 +323,7 @@ function JobDetail({ job, user, onClose, onClaim }) {
         </div>
         {job.description && <div className="job-desc">{job.description}</div>}
         <div className="job-meta">
-          <span>📍 {job.address}</span>
+          <a href={`https://maps.apple.com/?daddr=${encodeURIComponent(job.address)}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--green)', textDecoration: 'underline' }}>📍 {job.address}</a>
           <span>🕐 {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
         </div>
         <span className={`job-status status-${job.status}`}>{job.status}</span>
