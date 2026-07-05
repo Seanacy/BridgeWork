@@ -10,6 +10,29 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const MAPBOX_TOKEN = window.__MAPBOX_TOKEN || '';
 const ADMIN_EMAIL = '247ggtms@gmail.com';
 
+// ─── Pin fuzzing: signed-out visitors see job markers offset 200-500m from the ───
+// ─── real spot (same trick used on TentCity's map). Deterministic per job id. ───
+function seededRandom(seed) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
+  }
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), h | 1);
+    h ^= h + Math.imul(h ^ (h >>> 7), h | 61);
+    return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function fuzzJobLocation(jobId, lat, lng) {
+  const rand = seededRandom(`bw-job-${jobId}`);
+  const angle = rand() * 2 * Math.PI;
+  const distanceMeters = 200 + rand() * 300;
+  const dLat = (distanceMeters * Math.cos(angle)) / 111320;
+  const dLng = (distanceMeters * Math.sin(angle)) / (111320 * Math.cos((lat * Math.PI) / 180));
+  return { lat: lat + dLat, lng: lng + dLng };
+}
+
 // ─── Location Tracking (pings TentCity's location_pings table) ───
 async function hashUserId(userId) {
   const data = new TextEncoder().encode(userId);
@@ -904,17 +927,19 @@ function MapView({ user, onAuth }) {
     jobs.forEach(job => {
       if (!job.lat || !job.lng) return;
 
+      const pin = user ? { lat: job.lat, lng: job.lng } : fuzzJobLocation(job.id, job.lat, job.lng);
+
       const color = job.status === 'open' ? '#22c55e' : '#f0ad4e';
 
       const el = document.createElement('div');
       el.style.cssText = `width:28px;height:28px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);cursor:pointer;`;
 
       const marker = new mapboxgl.Marker(el)
-        .setLngLat([job.lng, job.lat])
+        .setLngLat([pin.lng, pin.lat])
         .addTo(map.current);
 
       el.addEventListener('click', () => {
-        map.current.flyTo({ center: [job.lng, job.lat], zoom: 14 });
+        map.current.flyTo({ center: [pin.lng, pin.lat], zoom: 14 });
         if (!user) {
           setShowSignupPrompt(true);
         } else {
@@ -924,7 +949,7 @@ function MapView({ user, onAuth }) {
 
       markersRef.current.push(marker);
     });
-  }, [jobs]);
+  }, [jobs, user]);
 
   const locateMe = () => {
     if (!navigator.geolocation) return;
