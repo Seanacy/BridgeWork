@@ -211,6 +211,17 @@ label {
   color: var(--green); font-weight: 600; cursor: pointer;
   text-decoration: none;
 }
+.auth-divider {
+  display: flex; align-items: center; gap: 0.75rem; margin: 1.25rem 0;
+  color: var(--text-muted); font-size: 0.75rem; font-weight: 600;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--border);
+}
+.btn-google {
+  background: #fff; border: 1.5px solid var(--border); color: #1a1a2e;
+}
+.btn-google:hover { border-color: #4285F4; background: #f8f9fa; }
 
 /* ─── Page panels (profile, post job, etc.) ─── */
 .page-panel {
